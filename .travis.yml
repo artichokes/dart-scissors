@@ -1,9 +1,13 @@
 language: dart
 sudo: false
 dart:
-  - stable
+  - dev
 cache:
   directories:
     - $HOME/.pub-cache/hosted
+before_script:
+- mkdir -p $HOME/bin
+- svn checkout http://cssjanus.googlecode.com/svn/trunk/ $HOME/bin
+- export PATH=$HOME/bin/cssjanus:$PATH
 script:
 - TEST_EXAMPLES=0 ./presubmit.sh
