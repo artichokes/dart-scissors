@@ -14,7 +14,7 @@ most of them are disabled or optimized for speed with `pub serve` in debug mode.
   - Supports `ng-class` and `class` with programmatic interpolated fragments
     (e.g. `class="some-{{fragmented}}-class and-some-normal-class"`,
     `ng-class="{'some-class': isSome}"`).
-  - Enabled by default in debug mode.
+  - Disabled by default in debug mode.
 - CSS mirroring for Angular (see [example/mirroring](https://github.com/google/dart-scissors/tree/master/example/mirroring)):
   - Performs RTL mirroring of CSS.
   - Could be used as a standalone transformer and with scissors transformer.
