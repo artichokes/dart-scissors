@@ -57,12 +57,4 @@ a[href="three.html"] {
 @media screen and (min-width: 401px) {
     body { margin-left: 13px }
 }
-@keyframes pulse {
-    0% {
-        background-color: #001f3f;
-    }
-    100% {
-        background-color: #ff4136;
-    }
-}
 

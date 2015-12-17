@@ -6,6 +6,7 @@ import 'messages_ar.dart' deferred as messages_ar;
 import 'messages_en.dart' deferred as messages_en;
 import 'messages_fr.dart' deferred as messages_fr;
 
+// TODO(ochafik): Switch examples to a real package:intl translation
 var messages;
 
 Future initializeMessages(String locale) async {

@@ -7,7 +7,7 @@ import 'package:scissors_mirroring_example/foo.dart';
 import 'package:intl/intl.dart';
 import 'dart:html';
 
-
+// TODO(ochafik): add comments
 main() async {
   var languageRx = new RegExp(r'\bhl=(\w+)\b');
   Intl.defaultLocale = languageRx.firstMatch(window.location.href)?.group(1) ??

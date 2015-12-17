@@ -30,6 +30,31 @@ makePhases(Map config) => [
 void main() {
   var phases = makePhases({});
 
+  testPhases(
+      'splits the rule with language dependent declaration to common rule and language dependent rules',
+      phases, {
+    'a|foo2_unmatched_css_url.css': r'''
+          absent-element {
+            color: blue;
+            float: right;
+        }
+       '''
+  }, {
+    'a|foo2_unmatched_css_url.css': r'''
+          absent-element {
+            color: blue;
+            }
+
+          :host-context([dir="ltr"]) absent-element {
+            float: right;
+        }
+
+          :host-context([dir="rtl"]) absent-element {
+            float: left;
+        }
+        '''
+  });
+
   testPhases('removes empty rules', phases, {
     'a|foo2_unmatched_css_url.css': r'''
         .used-class {}
@@ -42,8 +67,8 @@ void main() {
     '''
   });
 
-  testPhases(
-      'changes rules contaning only direction dependent declarations to direction dependent rules without any rule for common values',
+/// changes rules contaning only direction dependent declarations to direction dependent rules without any rule for common values
+  testPhases('drops orientation-neutral rules when they are empty',
       phases, {
     'a|foo2_unmatched_css_url.css': r'''
           absent-element {
@@ -77,7 +102,8 @@ void main() {
         }
         '''
   });
-  testPhases('keeps the rule with no changing declaration as same', phases, {
+
+  testPhases('leaves orientation-neutral rules unchanged', phases, {
     'a|foo2_unmatched_css_url.css': r'''
           absent-element {
             color: blue;
@@ -96,36 +122,6 @@ void main() {
         }
 
 
-        '''
-  });
-  testPhases(
-      'splits the rule with language dependent declaration to common rule and language dependent rules',
-      phases, {
-    'a|foo2_unmatched_css_url.css': r'''
-          absent-element {
-            color: blue;
-            float: right;
-        }
-          .usedclass {
-            background-size: 16px 16px;
-        }
-       '''
-  }, {
-    'a|foo2_unmatched_css_url.css': r'''
-          absent-element {
-            color: blue;
-            }
-          .usedclass {
-            background-size: 16px 16px;
-        }
-
-          :host-context([dir="ltr"]) absent-element {
-            float: right;
-        }
-
-          :host-context([dir="rtl"]) absent-element {
-            float: left;
-        }
         '''
   });
 

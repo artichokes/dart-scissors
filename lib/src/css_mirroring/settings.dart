@@ -25,7 +25,7 @@ abstract class CssMirroringSettings {
 
   final mirrorCss =
   new Setting<bool>('mirrorCss', debugDefault: true, releaseDefault: true);
-  final cssDirection =
+  final nativeDirection =
   new Setting<Direction>(
       'orignalCssDirection', defaultValue: Direction.ltr, parser: new EnumParser<Direction>(Direction.values).parse);
   final cssJanusPath =

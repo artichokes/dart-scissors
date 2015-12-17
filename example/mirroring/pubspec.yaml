@@ -16,7 +16,7 @@ transformers:
     # pruneCss: false
     # optimizeSvg: false
     # optimizePng: false
-- scissors/cssmirroring_transformer:
+- scissors/css_mirroring_transformer:
     verbose: true
     mirrorCss: true
     cssJanusPath: '/Users/monama/bin/cssjanus/cssjanus.py'

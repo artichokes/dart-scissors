@@ -69,7 +69,7 @@ class CssMirroringTransformer extends Transformer
     /// Read original source css.
     var source = await cssAsset.readAsString();
 
-    BidiCssGenerator generator = await BidiCssGenerator.build(source, cssAsset.id.toString(), _settings.cssDirection.value,
+    BidiCssGenerator generator = await BidiCssGenerator.build(source, cssAsset.id.toString(), _settings.nativeDirection.value,
         (String css) async {
           return await runCssJanus(css, _settings.cssJanusPath.value);
         });

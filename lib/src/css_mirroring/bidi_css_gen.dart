@@ -18,7 +18,7 @@ import 'dart:async';
 
 import 'package:csslib/parser.dart' show parse;
 import 'package:csslib/visitor.dart'
-    show RuleSet, StyleSheet, TreeNode, Declaration, MediaDirective, HostDirective, PageDirective, CharsetDirective, FontFaceDirective, ImportDirective, KeyFrameDirective, NamespaceDirective;
+    show RuleSet, StyleSheet, TreeNode, Declaration, Directive, MediaDirective, HostDirective, PageDirective, CharsetDirective, FontFaceDirective, ImportDirective, NamespaceDirective;
 import 'package:quiver/check.dart';
 import 'package:source_maps/refactor.dart';
 import 'package:source_span/source_span.dart';
@@ -26,7 +26,7 @@ import 'package:source_span/source_span.dart';
 import '../utils/enum_parser.dart';
 import 'transformer.dart' show CssMirroringSettings, Direction, flipDirection;
 
-enum RetensionMode {
+enum RetentionMode {
   keepBidiNeutral,  /// to keep parts of css which is direction independent eg: color and width
   keepOriginalBidiSpecific, /// to keep direction dependent parts of original css eg: margin.
   keepFlippedBidiSpecific /// to keep direction dependent parts of flipped css.
@@ -105,48 +105,42 @@ typedef Future<String> CssFlipper(String src);
 
 class _PendingRemovals {
   final String source;
-  final List<TreeNode> _topLevels;
   final TextEditTransaction _transaction;
-  // List to contain start and end location of declarations in transaction.
-  var _declStartPoints = <int>[];
-  var _declEndPoints = <int>[];
+  // List to contain start and end location of pending removals.
+  var _startLocations = <int>[];
+  var _endLocations = <int>[];
 
-  _PendingRemovals(TextEditTransaction trans, this._topLevels)
+  _PendingRemovals(TextEditTransaction trans)
       : _transaction = trans,
         source = trans.file.getText(0);
 
-  void addDeclRemoval(int start, int end) {
-    _declStartPoints.add(start);
-    _declEndPoints.add(end);
+  void addRemoval(int start, int end) {
+    _startLocations.add(start);
+    _endLocations.add(end);
   }
 
-  void commitDeclarations() {
-    for (int iDecl = 0; iDecl < _declStartPoints.length; iDecl++)
-      _transaction.edit(_declStartPoints[iDecl], _declEndPoints[iDecl], '');
-    _declStartPoints.clear();
-    _declEndPoints.clear();
+  void commitRemovals() {
+    for (int iDecl = 0; iDecl < _startLocations.length; iDecl++) {
+      _transaction.edit(_startLocations[iDecl], _endLocations[iDecl], '');
+    }
+    _startLocations.clear();
+    _endLocations.clear();
   }
 }
 
 class BidiCssGenerator {
   final String _originalCss;
   final String _flippedCss;
+  final String _cssSourceId;
   final List<TreeNode> _originalTopLevels;
   final List<TreeNode> _flippedTopLevels;
   final Direction _nativeDirection;
 
-  TextEditTransaction _orientationNeutralTransaction;
-  TextEditTransaction _orientationSpecificTransaction;
-  TextEditTransaction _flippedOrientationSpecificTransaction;
-
-  BidiCssGenerator._(String originalCss, String flippedCss, String cssSourceId, this._nativeDirection)
+  BidiCssGenerator._(String originalCss, String flippedCss, this._cssSourceId, this._nativeDirection)
       : _originalCss = originalCss,
         _flippedCss = flippedCss,
         _originalTopLevels = parse(originalCss).topLevels,
-        _flippedTopLevels = parse(flippedCss).topLevels,
-        _orientationNeutralTransaction = _makeTransaction(originalCss, cssSourceId),
-        _orientationSpecificTransaction = _makeTransaction(originalCss, cssSourceId),
-        _flippedOrientationSpecificTransaction = _makeTransaction(flippedCss, cssSourceId);
+        _flippedTopLevels = parse(flippedCss).topLevels;
 
   static build(
       String originalCss, String cssSourceId, Direction nativeDirection, CssFlipper cssFlipper) async {
@@ -156,112 +150,110 @@ class BidiCssGenerator {
 
   /// main function which returns the bidirectional css.
   String getOutputCss() {
-    _modifyTransactions();
-    return _joinTransactions();
+    var orientationNeutral = _makeTransaction(_originalCss, _cssSourceId);
+    var orientationSpecific = _makeTransaction(_originalCss, _cssSourceId);
+    var flippedOrientationSpecific = _makeTransaction(_flippedCss, _cssSourceId);
+    /// Modifies the transactions to contain only the desired parts.
+
+    _editTransaction(orientationNeutral, RetentionMode.keepBidiNeutral, _nativeDirection);
+    _editTransaction(orientationSpecific, RetentionMode.keepOriginalBidiSpecific, _nativeDirection);
+    _editTransaction(flippedOrientationSpecific, RetentionMode.keepFlippedBidiSpecific, flipDirection(_nativeDirection));
+
+    String getText(TextEditTransaction t) => (t.commit()..build('')).text;
+
+    return [
+      getText(orientationNeutral),
+      getText(orientationSpecific),
+      getText(flippedOrientationSpecific)
+    ].join('\n');
   }
 
   /// Makes transaction from input string.
   static TextEditTransaction _makeTransaction(String inputCss, String url) =>
       new TextEditTransaction(inputCss, new SourceFile(inputCss, url: url));
 
-  /// Join the transactions to generate output transaction.
-  String _joinTransactions() {
-    return (_orientationNeutralTransaction.commit()
-      ..build('')).text + '\n' + (_orientationSpecificTransaction.commit()
-      ..build('')).text + '\n' +
-        (_flippedOrientationSpecificTransaction.commit()
-          ..build('')).text;
-  }
-
-  /// Modifies the transactions to contain only the desired parts.
-  _modifyTransactions() {
-    _editTransaction(_orientationNeutralTransaction, RetensionMode.keepBidiNeutral, _nativeDirection);
-    _editTransaction(_orientationSpecificTransaction, RetensionMode.keepOriginalBidiSpecific, _nativeDirection);
-    _editTransaction(_flippedOrientationSpecificTransaction, RetensionMode.keepFlippedBidiSpecific, flipDirection(_nativeDirection));
-  }
-
-  /// Takes transaction to edit, the retension mode which defines which part to retain and the direction of the output css.
-  /// Modifies the transaction depending on the input parameters.
-  _editTransaction(TextEditTransaction trans, RetensionMode mode, Direction targetDirection) {
+  /// Takes transaction to edit, the retention mode which defines which part to retain and the direction of the output css.
+  /// In case rulesets it drops declarations in them and if all the declaration in it have to be removed, it removes the rule itself.
+  /// In case Directives, it edits rulesets in them and if all the rulesets have to be removed, it removes Directive Itself
+  _editTransaction(TextEditTransaction trans, RetentionMode mode, Direction targetDirection) {
 
     /// Iterate over topLevels.
     for (int iTopLevel = 0; iTopLevel < _originalTopLevels.length; iTopLevel++) {
       var originalTopLevel = _originalTopLevels[iTopLevel];
       var flippedTopLevel = _flippedTopLevels[iTopLevel];
-      var removals = new _PendingRemovals(trans, mode == RetensionMode.keepFlippedBidiSpecific ? _flippedTopLevels : _originalTopLevels);
 
       if (originalTopLevel is RuleSet && flippedTopLevel is RuleSet) {
-        _editRuleSet(removals, mode, targetDirection, iTopLevel, removals.source.length);
+        _editRuleSet(trans, mode, targetDirection, iTopLevel);
       }
       else if(originalTopLevel.runtimeType == flippedTopLevel.runtimeType && (originalTopLevel is MediaDirective || originalTopLevel is HostDirective)) {
-        TreeNode usedDirective = mode == RetensionMode.keepFlippedBidiSpecific ? flippedTopLevel : originalTopLevel;
-        _editDirectives(removals, usedDirective, originalTopLevel.rulesets, flippedTopLevel.rulesets, mode, targetDirection);
+        _editDirectives(trans, originalTopLevel, flippedTopLevel, mode, targetDirection);
       }
       else if(originalTopLevel.runtimeType == flippedTopLevel.runtimeType && _isDirectionIndependent(originalTopLevel)) {
-        if (mode != RetensionMode.keepBidiNeutral) {
-          _removeRuleSet(removals, iTopLevel);
+        if (mode != RetentionMode.keepBidiNeutral) {
+          _removeRuleSet(trans,  mode == RetentionMode.keepFlippedBidiSpecific ? _flippedTopLevels : _originalTopLevels, iTopLevel);
         }
       }
       else {
         checkState(originalTopLevel.runtimeType == flippedTopLevel.runtimeType);
-        // TODO: throw sass file error
-        // TODO: handle pagedirective and key frame animation.
       }
     }
   }
 
   /// Edit the topLevel Ruleset.
   /// It takes transaction, the topLevels of original and flipped css, Retantion mode, Direction of output css, the index of current topLevel and end of parent of topLevel.
-   _editRuleSet(_PendingRemovals removals, RetensionMode mode, Direction targetDirection, int iTopLevel, int parentEnd) {
+   _editRuleSet(TextEditTransaction trans, RetentionMode mode, Direction targetDirection, int iTopLevel) {
+     var removals = new _PendingRemovals(trans);
+     var usedTopLevels = mode == RetentionMode.keepFlippedBidiSpecific ? _flippedTopLevels : _originalTopLevels;
     _storeRemovableDeclarations(removals, _originalTopLevels, _flippedTopLevels, mode, iTopLevel);
     if (_isRuleRemovable(removals, _originalTopLevels[iTopLevel])) {
-      _removeRuleSet(removals, iTopLevel);
+      _removeRuleSet(trans, usedTopLevels, iTopLevel);
     }
     else {
-      removals.commitDeclarations();
+      removals.commitRemovals();
       /// Add direction attribute to RuleId for direction-specific RuleSet.
-      if (mode != RetensionMode.keepBidiNeutral) {
-        _appendDirectionToRuleSet(removals, removals._topLevels[iTopLevel], targetDirection);
+      if (mode != RetentionMode.keepBidiNeutral) {
+        _prependDirectionToRuleSet(trans, usedTopLevels[iTopLevel], targetDirection);
       }
     }
   }
 
-  _editDirectives(_PendingRemovals removals, var usedDirective, List<RuleSet> originalRuleSets, List<RuleSet> flippedRuleSets, RetensionMode mode, Direction targetDirection) {
-    var _ruleStartPoints = <int>[];
-    var _ruleEndPoints = <int>[];
+  _editDirectives(TextEditTransaction trans, var originalDirective, var flippedDirective, RetentionMode mode, Direction targetDirection) {
+    var originalRuleSets = originalDirective.rulesets;
+    var flippedRuleSets = flippedDirective.rulesets;
+    var usedDirective = mode == RetentionMode.keepFlippedBidiSpecific ? flippedDirective : originalDirective;
+    _PendingRemovals removableRuleSets = new _PendingRemovals(trans);
     for(int iRuleSet = 0; iRuleSet < originalRuleSets.length; iRuleSet++) {
-        _storeRemovableDeclarations(removals, originalRuleSets, flippedRuleSets, mode, iRuleSet);
-        if(_isRuleRemovable(removals, originalRuleSets[iRuleSet])) {
-          var startOffset = _getRuleSetStart(originalRuleSets[iRuleSet]);
-          var endOffset = _getRuleSetEnd(usedDirective.rulesets, iRuleSet, usedDirective.span.end.offset);
-          _ruleStartPoints.add(startOffset);
-          _ruleEndPoints.add(endOffset);
+        _PendingRemovals removableDeclarations = new _PendingRemovals(trans);
+        _storeRemovableDeclarations(removableDeclarations, originalRuleSets, flippedRuleSets, mode, iRuleSet);
+        if(_isRuleRemovable(removableDeclarations, originalRuleSets[iRuleSet])) {
+          removableRuleSets.addRemoval(_getNodeStart(originalRuleSets[iRuleSet]), _getRuleSetEnd(usedDirective.rulesets, iRuleSet, usedDirective.span.end.offset));
         }
       else {
-          removals.commitDeclarations();
-          if (mode != RetensionMode.keepBidiNeutral) {
-            _appendDirectionToRuleSet(removals, usedDirective.rulesets[iRuleSet], targetDirection);
+          removableDeclarations.commitRemovals();
+          if (mode != RetentionMode.keepBidiNeutral) {
+            _prependDirectionToRuleSet(trans, usedDirective.rulesets[iRuleSet], targetDirection);
           }
         }
     }
-    if(_ruleStartPoints.length == originalRuleSets.length ) { // All rules are to be deleted
-      _removeDirective(removals, usedDirective);
+    if(removableRuleSets._startLocations.length == originalRuleSets.length ) { // All rules are to be deleted
+      _removeDirective(trans, usedDirective);
     }
     else {
-      _removeStoredRules(removals, _ruleStartPoints, _ruleEndPoints);
+      removableRuleSets.commitRemovals();
     }
   }
 
-  _storeRemovableDeclarations(_PendingRemovals removals, var originalTopLevels, var flippedTopLevels, RetensionMode mode, int iTopLevel) {
+  /// Stores start and end locations of removable declarations in a ruleset based upon the retension mode.
+  _storeRemovableDeclarations(_PendingRemovals removals, List<RuleSet> originalTopLevels, List<RuleSet> flippedTopLevels, RetentionMode mode, int iTopLevel) {
     var originalDecls = originalTopLevels[iTopLevel].declarationGroup.declarations;
     var flippedDecls = flippedTopLevels[iTopLevel].declarationGroup.declarations;
 
     /// Iterate over Declarations in RuleSet and store start and end points of declarations to be removed.
     for (int iDecl = 0; iDecl < originalDecls.length; iDecl++) {
       if (originalDecls[iDecl] is Declaration && flippedDecls[iDecl] is Declaration) {
-        if (shouldRemoveDecl(mode, originalDecls[iDecl], flippedDecls[iDecl])) {
-          var decls = mode == RetensionMode.keepFlippedBidiSpecific ? flippedDecls : originalDecls;
-          removals.addDeclRemoval(decls[iDecl].span.start.offset, _getDeclarationEnd(removals.source, iDecl, originalDecls, decls));
+        if (_shouldRemoveDecl(mode, originalDecls[iDecl], flippedDecls[iDecl])) {
+          var decls = mode == RetentionMode.keepFlippedBidiSpecific ? flippedDecls : originalDecls;
+          removals.addRemoval(decls[iDecl].span.start.offset, _getDeclarationEnd(removals.source, iDecl, decls));
         }
       }
       else {
@@ -270,27 +262,21 @@ class BidiCssGenerator {
     }
   }
 
-  _appendDirectionToRuleSet(_PendingRemovals removals, RuleSet ruleSet, Direction targetDirection) {
-    removals._transaction.edit(ruleSet.span.start.offset, ruleSet.span.end.offset,
-        ':host-context([dir="${enumName(targetDirection)}"]) ' +
-            ruleSet.span.text);
+  _prependDirectionToRuleSet(TextEditTransaction trans, RuleSet ruleSet, Direction targetDirection) {
+    trans.edit(ruleSet.span.start.offset, ruleSet.span.start.offset,
+        ':host-context([dir="${enumName(targetDirection)}"]) ');
   }
 
-  _removeStoredRules(_PendingRemovals removals, List<int> ruleStartPoints, List<int> ruleEndPoints) {
-    for(int iPoint = 0; iPoint < ruleStartPoints.length; iPoint++) {
-      removals._transaction.edit(ruleStartPoints[iPoint], ruleEndPoints[iPoint], '');
-    }
-  }
   /// Removes a rule from the transaction.
-  _removeRuleSet(_PendingRemovals removals, int iTopLevel) {
-    removals._transaction.edit(_getRuleSetStart(removals._topLevels[iTopLevel]), _getRuleSetEnd(removals._topLevels, iTopLevel, removals.source.length), '');
+  _removeRuleSet(TextEditTransaction trans, List<RuleSet> rulesets, int iTopLevel) {
+    trans.edit(_getNodeStart(rulesets[iTopLevel]), _getRuleSetEnd(rulesets, iTopLevel, trans.file.length), '');
   }
 
-  _removeDirective(_PendingRemovals removals, TreeNode topLevel) {
-    removals._transaction.edit(_getRuleSetStart(topLevel) , topLevel.span.end.offset, '');
+  _removeDirective(TextEditTransaction trans, TreeNode topLevel) {
+    trans.edit(_getNodeStart(topLevel) , topLevel.span.end.offset, '');
   }
 
-  static int _getRuleSetStart(TreeNode node) {
+  static int _getNodeStart(TreeNode node) {
     if(node is RuleSet)
       return node.span.start.offset;
     // In case of Directives since the node span start does not include '@' so additional -1 is required.
@@ -299,13 +285,13 @@ class BidiCssGenerator {
 
   static int _getRuleSetEnd(List<RuleSet> ruleSets, int iTopLevel, int parentEnd) {
     var end = iTopLevel < ruleSets.length - 1
-        ? _getRuleSetStart(ruleSets[iTopLevel + 1])
+        ? _getNodeStart(ruleSets[iTopLevel + 1])
         : parentEnd;
     return end;
   }
 
-  static int _getDeclarationEnd(String source, int iDecl, var originalDecls, var decls) {
-    if (iDecl < originalDecls.length - 1) {
+  static int _getDeclarationEnd(String source, int iDecl, List<Declaration> decls) {
+    if (iDecl < decls.length - 1) {
       return decls[iDecl + 1].span.start.offset;
     } else {
       int fileLength = source.length;
@@ -328,28 +314,21 @@ class BidiCssGenerator {
     }
   }
 
-  bool _isRuleRemovable(_PendingRemovals removals, var originalTopLevel) =>
-      removals._declStartPoints.length == originalTopLevel.declarationGroup.declarations.length;
+  /// A rule can removed if all the declarations in the rule can be removed.
+  bool _isRuleRemovable(_PendingRemovals removals, RuleSet rule) =>
+      removals._startLocations.length == rule.declarationGroup.declarations.length;
 
-  /// Checks if a topLevel is direction independent.
-  bool _isDirectionIndependent(var originalTopLevel) {
-    List _directionIndependentDirectives = [
-      CharsetDirective,
-      FontFaceDirective,
-      ImportDirective,
-      KeyFrameDirective,
-      NamespaceDirective
-    ];
-    if(_directionIndependentDirectives.contains(originalTopLevel.runtimeType))
-      return true;
-    return false;
-  }
-
-  bool shouldRemoveDecl(RetensionMode mode, Declaration original, Declaration flipped) {
+  /// Checks if the declaration has to be removed based on the the Retention mode.
+  static bool _shouldRemoveDecl(RetentionMode mode, Declaration original, Declaration flipped) {
     var isEqual = _areDeclarationsEqual(original, flipped);
-    return mode == RetensionMode.keepBidiNeutral ? !isEqual : isEqual;
+    return mode == RetentionMode.keepBidiNeutral ? !isEqual : isEqual;
   }
 
 }
+/// Checks if a topLevel tree node is direction independent.
+bool _isDirectionIndependent(TreeNode node) {
+return node is CharsetDirective || node is FontFaceDirective || node is ImportDirective || node is NamespaceDirective;
+}
+
 bool _areDeclarationsEqual(Declaration a, Declaration b) =>
     a.span.text == b.span.text;

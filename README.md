@@ -17,8 +17,9 @@ most of them are disabled or optimized for speed with `pub serve` in debug mode.
   - Enabled by default in debug mode.
 - CSS mirroring for Angular (see [example/mirroring](https://github.com/google/dart-scissors/tree/master/example/mirroring)):
   - Performs RTL mirroring of CSS.
+  - Could be used as a standalone transformer and with scissors transformer.
   - Uses cssjanus, with extra logic to know which properties are flippable and to recombine the three portions: orientation-neutral, non-flipped orientation-specific, flipped orientation-specific.
-  - Disabled by default in debug mode.
+  - Enabled by default in debug mode.
 - [Sass](http://sass-lang.com) compilation:
   - Compiles `*.sass` and `*.scss` files with [`sassc`](https://github.com/sass/sassc),
     the lightning-fast C++ port of Ruby Sass.
@@ -129,9 +130,10 @@ The last "unscoped" strategy means there's no file- or
 component-local way of deciding if a style *could* be used elsewhere. You should
 not use sCiSSors on packages / projects with that strategy.
 
-## Using `scissors/cssmirroring_transformer`
+## Using `scissors/css_mirroring_transformer`
 
-Required: Css janus.
+Required: Css janus [https://github.com/cegov/wiki/tree/master/maintenance/cssjanus]
+          Note: Two versions avaibale - Google's original cssjanus.py and [https://github.com/cssjanus/cssjanus]. Here the transofrmer uses Google's original cssjanus.py
           Run the following command in shell:
             mkdir -p $HOME/bin && svn checkout http://cssjanus.googlecode.com/svn/trunk/ $HOME/bin && export PATH=$HOME/bin/cssjanus:$PATH
 
@@ -148,12 +150,12 @@ Example: see [example/mirroring](https://github.com/google/dart-scissors/tree/ma
 
 Valid settings:
 - `mirrorCss`: `true` by default in release mode and false by default in debug mode.
-- `cssDirection` `ltr` by default in debug and release mode.
+- `nativeDirection`: Defines the direction of input css. `ltr` by default in debug and release mode.
 - `cssJanusPath`: `cssJanus` by default.
 
 ###Limitations
- - Works only on css files. Pre-processors like sass and less are not supported. 
- - Does not handle directives like KeyFrames and page.
+ - Works only on css files when used as standalone css_mirroring_transformer. 
+ - Does not handle directives like @keyframes and @page.
 
 ## Using `scissors/permutations_transformer`
 
