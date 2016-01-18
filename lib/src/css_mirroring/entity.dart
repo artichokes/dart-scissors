@@ -99,10 +99,11 @@ class FlippableEntities<T extends TreeNode> {
 }
 
 int _getNodeStart(TreeNode node) {
-  if (node is RuleSet) return node.span.start.offset;
-// In case of Directives since the node span start does not include '@'
-// so additional -1 is required.
-  return node.span.start.offset - 1;
+  if (node is Directive) {
+    // The node span start does not include '@' so additional -1 is required.
+    return node.span.start.offset - 1;
+  }
+  return node.span.start.offset;
 }
 
 /// If it is the last rule of ruleset delete rule till the end of parent which is
