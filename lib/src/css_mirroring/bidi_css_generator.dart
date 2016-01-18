@@ -60,8 +60,10 @@ class BidiCssGenerator {
   BidiCssGenerator._(this._originalCss, this._flippedCss, this._sourceId,
       this._nativeDirection) {
     _topLevels = new MirroredEntities(
-        _originalCss, parse(_originalCss).topLevels,
-        _flippedCss, parse(_flippedCss).topLevels);
+        _originalCss,
+        parse(_originalCss).topLevels,
+        _flippedCss,
+        parse(_flippedCss).topLevels);
   }
 
   static build(String originalCss, String cssSourceId,
@@ -79,8 +81,8 @@ class BidiCssGenerator {
     var orientationSpecificTransaction = _makeTransaction(_originalCss);
     var flippedOrientationSpecificTransaction = _makeTransaction(_flippedCss);
 
-    final orientationNeutral = new EditConfiguration(
-        RetentionMode.keepBidiNeutral, _nativeDirection);
+    final orientationNeutral =
+        new EditConfiguration(RetentionMode.keepBidiNeutral, _nativeDirection);
     final orientationSpecific = new EditConfiguration(
         RetentionMode.keepOriginalBidiSpecific, _nativeDirection);
     final flippedOrientationSpecific = new EditConfiguration(
@@ -89,8 +91,7 @@ class BidiCssGenerator {
     /// Modifies the transactions to contain only the desired parts.
     _editCss(orientationNeutralTransaction, orientationNeutral);
     _editCss(orientationSpecificTransaction, orientationSpecific);
-    _editCss(
-        flippedOrientationSpecificTransaction, flippedOrientationSpecific);
+    _editCss(flippedOrientationSpecificTransaction, flippedOrientationSpecific);
 
     String getText(TextEditTransaction t) => (t.commit()..build('')).text;
 
@@ -111,7 +112,6 @@ class BidiCssGenerator {
   /// to be removed, it removes Directive Itself
   void _editCss(
       TextEditTransaction textEditTrans, EditConfiguration editConfig) {
-
     var trans = new BufferedTransaction(textEditTrans);
     _topLevels.forEach((MirroredEntity<TreeNode> entity) {
       var original = entity.original.value;

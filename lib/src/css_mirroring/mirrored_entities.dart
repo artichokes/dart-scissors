@@ -21,31 +21,22 @@ class MirroredEntity<T extends TreeNode> {
   void remove(RetentionMode mode, BufferedTransaction trans) =>
       choose(mode).remove(trans);
 
-  Entity<T> choose(RetentionMode mode) {
-    switch (mode) {
-      case RetentionMode.keepFlippedBidiSpecific:
-        return flipped;
-      case RetentionMode.keepOriginalBidiSpecific:
-        return original;
-      case RetentionMode.keepBidiNeutral:
-        throw new ArgumentError('Invalid choice: $mode');
-    }
-  }
+  Entity<T> choose(RetentionMode mode) =>
+      mode == RetentionMode.keepFlippedBidiSpecific ? flipped : original;
 
-  Entity<T> get original =>
-      new Entity<T>(_entities.originalSource, _entities.originals, index, parent?.original);
+  Entity<T> get original => new Entity<T>(
+      _entities.originalSource, _entities.originals, index, parent?.original);
 
-  Entity<T> get flipped =>
-      new Entity<T>(_entities.flippedSource, _entities.flippeds, index, parent?.flipped);
+  Entity<T> get flipped => new Entity<T>(
+      _entities.flippedSource, _entities.flippeds, index, parent?.flipped);
 
-  MirroredEntity<T> get next => index < _entities.originals.length - 1
-      ? new MirroredEntity<T>(_entities, index + 1, parent)
-      : null;
-
-  MirroredEntities<dynamic> getChildren(List<dynamic> getEntityChildren(T value)) {
+  MirroredEntities<dynamic> getChildren(
+      List<dynamic> getEntityChildren(T value)) {
     return new MirroredEntities(
-        _entities.originalSource, getEntityChildren(original.value),
-        _entities.flippedSource, getEntityChildren(flipped.value),
+        _entities.originalSource,
+        getEntityChildren(original.value),
+        _entities.flippedSource,
+        getEntityChildren(flipped.value),
         parent: this);
   }
 }
@@ -60,8 +51,7 @@ class MirroredEntities<T extends TreeNode> {
   final MirroredEntity parent;
 
   MirroredEntities(
-      this.originalSource, this.originals,
-      this.flippedSource, this.flippeds,
+      this.originalSource, this.originals, this.flippedSource, this.flippeds,
       {this.parent}) {
     assert(originals.length == flippeds.length);
   }

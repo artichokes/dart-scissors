@@ -11,10 +11,10 @@ import 'rulesets_processor.dart' show editRuleSet, RemovalResult;
 /// in rulesets have to be removed, it removes ruleset itself.
 /// Also if all rulesets have to be removed, it removes the directive.
 editDirectiveWithNestedRuleSets(
-  MirroredEntity<Directive> directive,
-  MirroredEntities<RuleSet> nestedRuleSets,
-  EditConfiguration editConfig, BufferedTransaction trans) {
-
+    MirroredEntity<Directive> directive,
+    MirroredEntities<RuleSet> nestedRuleSets,
+    EditConfiguration editConfig,
+    BufferedTransaction trans) {
   var subTransaction = trans.createSubTransaction();
   bool removedAll = true;
   nestedRuleSets.forEach((MirroredEntity<RuleSet> ruleSet) {

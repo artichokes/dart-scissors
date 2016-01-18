@@ -16,11 +16,13 @@ class Entity<T extends TreeNode> {
   T get value {
     return _list[_index];
   }
+
   int get startOffset => _getNodeStart(value);
   int get endOffset {
     var value = this.value;
     if (value is RuleSet) {
-      return _getRuleSetEnd(_list, _index, _parent?.endOffset ?? _source.length);
+      return _getRuleSetEnd(
+          _list, _index, _parent?.endOffset ?? _source.length);
     }
     if (value is Declaration) {
       return getDeclarationEnd(_source, _list, _index);
@@ -53,31 +55,22 @@ class FlippableEntity<T extends TreeNode> {
   void remove(RetentionMode mode, BufferedTransaction trans) =>
       choose(mode).remove(trans);
 
-  Entity<T> choose(RetentionMode mode) {
-    switch (mode) {
-      case RetentionMode.keepFlippedBidiSpecific:
-        return flipped;
-      case RetentionMode.keepOriginalBidiSpecific:
-        return original;
-      case RetentionMode.keepBidiNeutral:
-        throw new ArgumentError('Invalid choice: $mode');
-    }
-  }
+  Entity<T> choose(RetentionMode mode) =>
+      mode == RetentionMode.keepFlippedBidiSpecific ? flipped : original;
 
-  Entity<T> get original =>
-      new Entity<T>(_entities.originalSource, _entities.originals, index, parent?.original);
+  Entity<T> get original => new Entity<T>(
+      _entities.originalSource, _entities.originals, index, parent?.original);
 
-  Entity<T> get flipped =>
-      new Entity<T>(_entities.flippedSource, _entities.flippeds, index, parent?.flipped);
+  Entity<T> get flipped => new Entity<T>(
+      _entities.flippedSource, _entities.flippeds, index, parent?.flipped);
 
-  FlippableEntity<T> get next => index < _entities.originals.length - 1
-      ? new FlippableEntity<T>(_entities, index + 1, parent)
-      : null;
-
-  FlippableEntities<dynamic> getChildren(List<dynamic> getEntityChildren(T value)) {
+  FlippableEntities<dynamic> getChildren(
+      List<dynamic> getEntityChildren(T value)) {
     return new FlippableEntities(
-        _entities.originalSource, getEntityChildren(original.value),
-        _entities.flippedSource, getEntityChildren(flipped.value));
+        _entities.originalSource,
+        getEntityChildren(original.value),
+        _entities.flippedSource,
+        getEntityChildren(flipped.value));
   }
 }
 
@@ -91,8 +84,7 @@ class FlippableEntities<T extends TreeNode> {
   final FlippableEntity parent;
 
   FlippableEntities(
-      this.originalSource, this.originals,
-      this.flippedSource, this.flippeds,
+      this.originalSource, this.originals, this.flippedSource, this.flippeds,
       {this.parent}) {
     assert(originals.length == flippeds.length);
   }

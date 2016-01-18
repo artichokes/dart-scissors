@@ -8,17 +8,15 @@ import 'edit_configuration.dart';
 import 'mirrored_entities.dart';
 import '../utils/enum_parser.dart';
 
-enum RemovalResult {
-  removedSome, removedAll
-}
+enum RemovalResult { removedSome, removedAll }
 
 /// Returns true if the [RuleSet] was completely removed, false otherwise.
 RemovalResult editRuleSet(MirroredEntity<RuleSet> mirroredRuleSet,
     EditConfiguration editConfig, BufferedTransaction trans) {
   final subTransaction = trans.createSubTransaction();
 
-  MirroredEntities<Declaration> mirroredDeclarations =
-      mirroredRuleSet.getChildren((RuleSet r) => r.declarationGroup.declarations);
+  MirroredEntities<Declaration> mirroredDeclarations = mirroredRuleSet
+      .getChildren((RuleSet r) => r.declarationGroup.declarations);
 
   /// Iterate over Declarations in RuleSet and store start and end points of
   /// declarations to be removed.
@@ -28,10 +26,10 @@ RemovalResult editRuleSet(MirroredEntity<RuleSet> mirroredRuleSet,
         message: () => 'Expected a declaration, got $decl');
 
     bool isEqual =
-      decl.original.value.span.text == decl.flipped.value.span.text;
+        decl.original.value.span.text == decl.flipped.value.span.text;
 
-    var shouldRemoveDecl = editConfig.mode == RetentionMode.keepBidiNeutral
-        ? !isEqual : isEqual;
+    var shouldRemoveDecl =
+        editConfig.mode == RetentionMode.keepBidiNeutral ? !isEqual : isEqual;
 
     if (shouldRemoveDecl) {
       decl.remove(editConfig.mode, trans);
