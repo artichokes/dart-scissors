@@ -32,19 +32,15 @@ import 'package:csslib/visitor.dart'
         StyleSheet,
         TreeNode;
 
-import 'package:quiver/check.dart';
 import 'package:source_maps/refactor.dart';
 import 'package:source_span/source_span.dart';
 
-import '../utils/enum_parser.dart';
-import 'util_classes.dart';
-import 'transformer.dart' show CssMirroringSettings, Direction, flipDirection;
-
-part 'directive_processors.dart';
-
-part 'rulesets_processor.dart';
-
-part 'util_functions.dart';
+import 'buffered_transaction.dart';
+import 'directive_processors.dart';
+import 'edit_configuration.dart';
+import 'mirrored_entities.dart';
+import 'rulesets_processor.dart';
+import 'css_utils.dart' show isDirectionInsensitive, hasNestedRuleSets;
 
 /// Type of a function that does LTR/RTL mirroring of a css.
 typedef Future<String> CssFlipper(String inputCss);
@@ -56,15 +52,16 @@ typedef Future<String> CssFlipper(String inputCss);
 class BidiCssGenerator {
   final String _originalCss;
   final String _flippedCss;
-  final String _cssSourceId;
+  final String _sourceId;
   final Direction _nativeDirection;
 
-  FlippableEntities<TreeNode> _topLevels;
+  MirroredEntities<TreeNode> _topLevels;
 
-  BidiCssGenerator._(this._originalCss, this._flippedCss, this._cssSourceId,
+  BidiCssGenerator._(this._originalCss, this._flippedCss, this._sourceId,
       this._nativeDirection) {
-    _topLevels = new FlippableEntities(
-        parse(_originalCss).topLevels, parse(_flippedCss).topLevels);
+    _topLevels = new MirroredEntities(
+        _originalCss, parse(_originalCss).topLevels,
+        _flippedCss, parse(_flippedCss).topLevels);
   }
 
   static build(String originalCss, String cssSourceId,
@@ -73,25 +70,26 @@ class BidiCssGenerator {
         cssSourceId, nativeDirection);
   }
 
+  TextEditTransaction _makeTransaction(String css) =>
+      new TextEditTransaction(css, new SourceFile(css, url: _sourceId));
+
   /// Main function which returns the bidirectional CSS.
   String getOutputCss() {
-    var orientationNeutralTransaction =
-        _makeTransaction(_originalCss, _cssSourceId);
-    var orientationSpecificTransaction =
-        _makeTransaction(_originalCss, _cssSourceId);
-    var flippedOrientationSpecificTransaction =
-        _makeTransaction(_flippedCss, _cssSourceId);
-    final orientationNeutral =
-        new EditConfiguration(RetentionMode.keepBidiNeutral, _nativeDirection);
+    var orientationNeutralTransaction = _makeTransaction(_originalCss);
+    var orientationSpecificTransaction = _makeTransaction(_originalCss);
+    var flippedOrientationSpecificTransaction = _makeTransaction(_flippedCss);
+
+    final orientationNeutral = new EditConfiguration(
+        RetentionMode.keepBidiNeutral, _nativeDirection);
     final orientationSpecific = new EditConfiguration(
         RetentionMode.keepOriginalBidiSpecific, _nativeDirection);
     final flippedOrientationSpecific = new EditConfiguration(
         RetentionMode.keepFlippedBidiSpecific, flipDirection(_nativeDirection));
 
     /// Modifies the transactions to contain only the desired parts.
-    _editTransaction(orientationNeutralTransaction, orientationNeutral);
-    _editTransaction(orientationSpecificTransaction, orientationSpecific);
-    _editTransaction(
+    _editCss(orientationNeutralTransaction, orientationNeutral);
+    _editCss(orientationSpecificTransaction, orientationSpecific);
+    _editCss(
         flippedOrientationSpecificTransaction, flippedOrientationSpecific);
 
     String getText(TextEditTransaction t) => (t.commit()..build('')).text;
@@ -111,22 +109,25 @@ class BidiCssGenerator {
   ///
   /// In case of Directives, it edits rulesets in them and if all the rulesets have
   /// to be removed, it removes Directive Itself
-  void _editTransaction(
-      TextEditTransaction trans, EditConfiguration editConfig) {
-    _topLevels.forEach((FlippableEntity<TreeNode> topLevelEntity) {
-      if (_areRuleSets(topLevelEntity)) {
-        removeDeclarationsAndDeleteEmptyRuleSets(
-            trans, editConfig, _topLevels, topLevelEntity.index);
-      } else if (_areDirDependentDirectives(topLevelEntity)) {
-        editRuleSetsInDirectionDependentDirectiveandRemoveEmptyDirective(
-            trans, editConfig, _topLevels, topLevelEntity.index);
-      } else if (_areDirIndependentDirectives(topLevelEntity)) {
-        keepDirectionIndependentDirectivesInBidiNeutralTransaction(
-            trans, editConfig, _topLevels, topLevelEntity.index);
+  void _editCss(
+      TextEditTransaction textEditTrans, EditConfiguration editConfig) {
+
+    var trans = new BufferedTransaction(textEditTrans);
+    _topLevels.forEach((MirroredEntity<TreeNode> entity) {
+      var original = entity.original.value;
+      if (original is RuleSet) {
+        editRuleSet(entity, editConfig, trans);
+      } else if (hasNestedRuleSets(original)) {
+        editDirectiveWithNestedRuleSets(
+            entity, entity.getChildren((d) => d.rulesets), editConfig, trans);
+      } else if (isDirectionInsensitive(original)) {
+        if (editConfig.mode != RetentionMode.keepBidiNeutral) {
+          entity.remove(editConfig.mode, trans);
+        }
       } else {
-        checkState(topLevelEntity.original.runtimeType ==
-            topLevelEntity.flipped.runtimeType);
+        throw new StateError('Node type not handled: ${original.runtimeType}');
       }
     });
+    trans.commit();
   }
 }

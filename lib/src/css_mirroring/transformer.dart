@@ -18,12 +18,12 @@ import 'dart:async';
 
 import 'package:barback/barback.dart';
 
+import 'bidi_css_generator.dart';
+import 'cssjanus_runner.dart';
 import '../utils/enum_parser.dart';
 import '../utils/file_skipping.dart';
 import '../utils/path_resolver.dart';
 import '../utils/settings_base.dart';
-import 'bidi_css_generator.dart';
-import 'cssjanus_runner.dart';
 
 part 'settings.dart';
 
