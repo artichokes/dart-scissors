@@ -205,8 +205,6 @@ void main() {
     '''
   }, {
     'a|foo2_unmatched_css_url.css': r'''
-
-
        @media screen and (min-width: 401px) {
                 :host-context([dir="ltr"]) body { margin-left: 13px }
        }
@@ -225,8 +223,6 @@ void main() {
     '''
   }, {
     'a|foo2_unmatched_css_url.css': r'''
-
-
        @host { :host-context([dir="ltr"]) :scope { padding: left; } }
 
        @host { :host-context([dir="rtl"]) :scope { padding: right; } }
