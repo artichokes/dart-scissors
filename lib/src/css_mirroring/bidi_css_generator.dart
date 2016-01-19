@@ -61,11 +61,9 @@ class BidiCssGenerator {
   /// Main function which returns the bidirectional CSS.
   String getOutputCss() {
     var parts = [
-      _editCss(_originalCss, RetentionMode.keepBidiNeutral, _nativeDirection),
-      _editCss(_originalCss, RetentionMode.keepOriginalBidiSpecific,
-          _nativeDirection),
-      _editCss(_flippedCss, RetentionMode.keepFlippedBidiSpecific,
-          flipDirection(_nativeDirection))
+      _cleanupCss(_originalCss),
+      _cleanupCss(_editCss(_flippedCss, RetentionMode.keepFlippedBidiSpecific,
+          flipDirection(_nativeDirection)))
     ];
     return parts.where((t) => t.trim().isNotEmpty).join('\n');
   }
@@ -106,8 +104,7 @@ class BidiCssGenerator {
     });
     bufferedTrans.commit();
 
-    var retainedCss = (trans.commit()..build('')).text;
-    return _cleanupCss(retainedCss);
+    return (trans.commit()..build('')).text;
   }
 }
 
