@@ -32,7 +32,7 @@ RemovalResult editRuleSet(MirroredEntity<RuleSet> mirroredRuleSet,
         editConfig.mode == RetentionMode.keepBidiNeutral ? !isEqual : isEqual;
 
     if (shouldRemoveDecl) {
-      decl.remove(editConfig.mode, trans);
+      decl.remove(editConfig.mode, subTransaction);
       removedCount++;
     }
   });
