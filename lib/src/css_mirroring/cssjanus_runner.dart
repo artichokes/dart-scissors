@@ -24,6 +24,6 @@ import '../utils/process_utils.dart';
 /// [cssJanusPath] points to an executable.
 Future<String> runCssJanus(String css, String cssJanusPath) async =>
     successString(
-        'Closure Compiler',
+        'cssjanus',
         await pipeInAndOutOfNewProcess(
             await Process.start(cssJanusPath, []), css));
