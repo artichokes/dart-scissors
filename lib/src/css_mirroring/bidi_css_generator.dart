@@ -99,7 +99,7 @@ class BidiCssGenerator {
       getText(orientationNeutralTransaction),
       getText(orientationSpecificTransaction),
       getText(flippedOrientationSpecificTransaction)
-    ].join('\n');
+    ].where((t) => t.trim().isNotEmpty).join('\n');
   }
 
   /// Takes transaction to edit, the retention mode which defines which part to

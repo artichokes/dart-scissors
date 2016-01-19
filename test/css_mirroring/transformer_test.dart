@@ -191,11 +191,7 @@ void main() {
     testPhases('keeps $directive directive untouched', phases, {
       'a|foo2_unmatched_css_url.css': css
     }, {
-      'a|foo2_unmatched_css_url.css': css +
-          r'''
-
-
-        '''
+      'a|foo2_unmatched_css_url.css': css
     });
   });
 

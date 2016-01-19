@@ -20,14 +20,15 @@ class Entity<T extends TreeNode> {
   int get startOffset => _getNodeStart(value);
   int get endOffset {
     var value = this.value;
-    if (value is RuleSet) {
-      return _getRuleSetEnd(
-          _list, _index, _parent?.endOffset ?? _source.length);
-    }
     if (value is Declaration) {
       return getDeclarationEnd(_source, _list, _index);
     } else {
-      return value.span.end.offset;
+      /// If it is the last rule of ruleset delete rule till the end of parent which is
+      /// document end in case of a toplevel ruleset and is directive end if ruleset is
+      /// part of a toplevel directive like @media directive.
+      return _index < _list.length - 1
+          ? _getNodeStart(_list[_index + 1])
+          : _parent?.endOffset ?? _source.length;
     }
   }
 
@@ -104,16 +105,6 @@ int _getNodeStart(TreeNode node) {
     return node.span.start.offset - 1;
   }
   return node.span.start.offset;
-}
-
-/// If it is the last rule of ruleset delete rule till the end of parent which is
-/// document end in case of a toplevel ruleset and is directive end if ruleset is
-/// part of a toplevel directive like @media directive.
-int _getRuleSetEnd(List ruleSets, int ruleSetIndex, int parentEnd) {
-  final int end = ruleSetIndex < ruleSets.length - 1
-      ? _getNodeStart(ruleSets[ruleSetIndex + 1])
-      : parentEnd;
-  return end;
 }
 
 int getDeclarationEnd(String source, List decls, int iDecl) {
