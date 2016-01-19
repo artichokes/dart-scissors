@@ -37,42 +37,41 @@ class MirroredEntity<T extends TreeNode> {
   Entity<T> choose(RetentionMode mode) =>
       mode == RetentionMode.keepFlippedBidiSpecific ? flipped : original;
 
-  Entity<T> get original => new Entity<T>(
-      _entities.originalSource, _entities.originals, index, parent?.original);
+  Entity<T> get original => new Entity<T>(_entities._originalSource,
+      _entities._originalEntities, index, parent?.original);
 
-  Entity<T> get flipped => new Entity<T>(
-      _entities.flippedSource, _entities.flippeds, index, parent?.flipped);
+  Entity<T> get flipped => new Entity<T>(_entities._flippedSource,
+      _entities._flippedEntities, index, parent?.flipped);
 
-  MirroredEntities<dynamic> getChildren(
-      List<dynamic> getEntityChildren(T value)) {
+  MirroredEntities<dynamic> getChildren(List<dynamic> getEntityChildren(T _)) {
     return new MirroredEntities(
-        _entities.originalSource,
+        _entities._originalSource,
         getEntityChildren(original.value),
-        _entities.flippedSource,
+        _entities._flippedSource,
         getEntityChildren(flipped.value),
         parent: this);
   }
 }
 
 class MirroredEntities<T extends TreeNode> {
-  final String originalSource;
-  final List<T> originals;
+  final String _originalSource;
+  final List<T> _originalEntities;
 
-  final String flippedSource;
-  final List<T> flippeds;
+  final String _flippedSource;
+  final List<T> _flippedEntities;
 
   final MirroredEntity parent;
 
-  MirroredEntities(
-      this.originalSource, this.originals, this.flippedSource, this.flippeds,
+  MirroredEntities(this._originalSource, this._originalEntities,
+      this._flippedSource, this._flippedEntities,
       {this.parent}) {
-    assert(originals.length == flippeds.length);
+    assert(_originalEntities.length == _flippedEntities.length);
   }
 
-  get length => originals.length;
+  get length => _originalEntities.length;
 
   void forEach(void process(MirroredEntity<T> entity)) {
-    for (int i = 0; i < originals.length; i++) {
+    for (int i = 0; i < _originalEntities.length; i++) {
       process(new MirroredEntity<T>(this, i, parent));
     }
   }

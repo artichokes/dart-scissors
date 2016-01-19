@@ -22,11 +22,11 @@ import 'package:source_maps/refactor.dart' show TextEditTransaction;
 import 'package:source_span/source_span.dart' show SourceFile;
 
 import 'buffered_transaction.dart';
+import 'css_utils.dart' show isDirectionInsensitive, hasNestedRuleSets;
 import 'directive_processors.dart' show editDirectiveWithNestedRuleSets;
 import 'edit_configuration.dart';
 import 'mirrored_entities.dart';
 import 'rulesets_processor.dart' show editRuleSet;
-import 'css_utils.dart' show isDirectionInsensitive, hasNestedRuleSets;
 
 /// Type of a function that does LTR/RTL mirroring of a css.
 typedef Future<String> CssFlipper(String inputCss);
@@ -84,6 +84,8 @@ class BidiCssGenerator {
     var bufferedTrans = new BufferedTransaction(trans);
 
     _topLevelEntities.forEach((MirroredEntity<TreeNode> entity) {
+      // Note: MirroredEntity guarantees type uniformity between original and
+      // flipped.
       var original = entity.original.value;
       if (original is RuleSet) {
         editRuleSet(entity, mode, targetDirection, bufferedTrans);
