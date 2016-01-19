@@ -183,11 +183,11 @@ void main() {
   directionIndependentDirectives.forEach((directive, css) {
     /// Keeps direction independent directives like
     /// @charset, @import, @font-face, @namespace same.
-    testPhases('keeps $directive directive untouched', phases, {
-      'a|foo2_unmatched_css_url.css': css
-    }, {
-      'a|foo2_unmatched_css_url.css': css
-    });
+    testPhases(
+        'keeps $directive directive untouched',
+        phases,
+        {'a|foo2_unmatched_css_url.css': css},
+        {'a|foo2_unmatched_css_url.css': css});
   });
 
   /// Splits direction dependent directives @media to direction independent and
